@@ -10,6 +10,11 @@ import SchemesPage from './pages/SchemesPage'
 import OCRPage from './pages/OCRPage'
 import DashboardPage from './pages/DashboardPage'
 
+
+
+
+
+
 export default function App() {
   return (
     <div className="min-h-screen gradient-bg">
