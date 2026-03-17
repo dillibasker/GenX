@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import slugify from 'slugify'
 
 // ── Chat Session ──
 const messageSchema = new mongoose.Schema({
@@ -19,28 +20,71 @@ const sessionSchema = new mongoose.Schema({
 })
 
 // ── Scheme ──
-const schemeSchema = new mongoose.Schema({
-  name: { type: String, required: true, index: true },
-  slug: { type: String, unique: true },
-  ministry: String,
-  department: String,
-  category: {
-    type: String,
-    enum: ['Agriculture', 'Education', 'Health', 'Housing', 'Women & Child', 'Finance', 'Employment', 'Disability', 'Other'],
+
+
+const schemeSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, trim: true },
+
+    slug: { type: String, unique: true, lowercase: true },
+
+    ministry: { type: String, trim: true },
+    department: { type: String, trim: true },
+
+    category: {
+      type: String,
+      enum: [
+        'Agriculture',
+        'Education',
+        'Health',
+        'Housing',
+        'Women & Child',
+        'Finance',
+        'Employment',
+        'Disability',
+        'Other',
+      ],
+      default: 'Other',
+    },
+
+    state: { type: String, default: 'Central', trim: true },
+
+    description: { type: String, trim: true },
+
+    eligibility: [{ type: String, trim: true }],
+
+    benefit: String,
+    benefitAmount: String,
+
+    documents: [{ type: String, trim: true }],
+
+    applyLink: String,
+
+    lastUpdated: { type: Date, default: Date.now },
+
+    isActive: { type: Boolean, default: true },
+
+    vectorId: String, // ChromaDB reference
   },
-  state: { type: String, default: 'Central' },
-  description: String,
-  eligibility: [String],
-  benefit: String,
-  benefitAmount: String,
-  documents: [String],
-  applyLink: String,
-  lastUpdated: { type: Date, default: Date.now },
-  isActive: { type: Boolean, default: true },
-  vectorId: String, // ChromaDB reference
+  {
+    timestamps: true, // ✅ adds createdAt & updatedAt
+  }
+)
+
+/* 🔥 TEXT INDEX (VERY IMPORTANT) */
+schemeSchema.index({
+  name: 'text',
+  description: 'text',
 })
 
-schemeSchema.index({ name: 'text', description: 'text', category: 1 })
+/* 🔥 AUTO SLUG GENERATION */
+schemeSchema.pre('save', function (next) {
+  if (!this.slug) {
+    this.slug = slugify(this.name, { lower: true, strict: true })
+  }
+  next()
+})
+
 
 // ── User ──
 const userSchema = new mongoose.Schema({

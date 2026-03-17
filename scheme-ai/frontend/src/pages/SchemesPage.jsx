@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo ,useEffect  } from 'react'
+import axios from 'axios'
 import { motion, AnimatePresence } from 'framer-motion'
 import { RiSearchLine, RiExternalLinkLine, RiCheckLine, RiFilterLine, RiCloseLine, RiHeartLine, RiHeartFill } from 'react-icons/ri'
 import toast from 'react-hot-toast'
@@ -13,9 +14,9 @@ const STATES = [
   'Madhya Pradesh','Maharashtra','Odisha','Punjab','Rajasthan',
   'Tamil Nadu','Telangana','Uttar Pradesh','Uttarakhand','West Bengal',
 ]
-
+/*
 const ALL_SCHEMES = [
-  { id: 1,  name: 'PM-KISAN Samman Nidhi',        ministry: 'Ministry of Agriculture',           category: 'Agriculture',   state: 'Central',          benefit: '₹6,000/year',            description: 'Direct income support to all landholding farmers\' families with cultivable land.',                           eligibility: ['Landholding farmer', 'Indian citizen', 'Not a govt. employee'], apply_link: 'https://pmkisan.gov.in',      match: 92 },
+  { id: 1,  name: ' Nidhi',        ministry: 'Ministry of Agriculture',           category: 'Agriculture',   state: 'Central',          benefit: '₹6,000/year',            description: 'Direct income support to all landholding farmers\' families with cultivable land.',                           eligibility: ['Landholding farmer', 'Indian citizen', 'Not a govt. employee'], apply_link: 'https://pmkisan.gov.in',      match: 92 },
   { id: 2,  name: 'PM Ujjwala Yojana',             ministry: 'Ministry of Petroleum',             category: 'Women & Child', state: 'Central',          benefit: 'Free LPG connection',    description: 'Free LPG connections to women from Below Poverty Line (BPL) households.',                                    eligibility: ['BPL household', 'Woman aged 18+', 'No existing LPG connection'], apply_link: 'https://pmuy.gov.in',        match: 87 },
   { id: 3,  name: 'National Scholarship Portal',   ministry: 'Ministry of Education',             category: 'Education',     state: 'Central',          benefit: 'Up to ₹50,000/year',    description: 'Scholarships for students from minority, SC/ST, OBC communities and merit-based awards.',                   eligibility: ['Student in recognized institution', 'Income < ₹2.5L', 'Min 50% marks'], apply_link: 'https://scholarships.gov.in', match: 78 },
   { id: 4,  name: 'Ayushman Bharat PM-JAY',        ministry: 'Ministry of Health',                category: 'Health',        state: 'Central',          benefit: '₹5 lakh health cover',  description: 'World\'s largest health assurance scheme providing ₹5 lakh per family per year for hospitalisation.',        eligibility: ['SECC 2011 beneficiary', 'Deprived rural family'], apply_link: 'https://pmjay.gov.in',           match: 95 },
@@ -35,7 +36,7 @@ const ALL_SCHEMES = [
   { id: 18, name: 'Andhra Pradesh YSR Pension',    ministry: 'Andhra Pradesh Govt',               category: 'Finance',       state: 'Andhra Pradesh',   benefit: '₹3,000/month',          description: 'Old age pension of ₹3000/month for elderly citizens above 65 years in Andhra Pradesh.',                  eligibility: ['Age above 65', 'AP resident', 'Annual income < ₹10,000'], apply_link: 'https://navasakam.ap.gov.in', match: 84 },
   { id: 19, name: 'Rajasthan Palanhar Yojana',     ministry: 'Rajasthan Govt',                    category: 'Women & Child', state: 'Rajasthan',        benefit: '₹1,500/month per child','description': 'Financial support to families raising orphan or destitute children in Rajasthan.',                     eligibility: ['Guardian of orphan/destitute child', 'Rajasthan resident', 'BPL family'], apply_link: 'https://sje.rajasthan.gov.in', match: 79 },
   { id: 20, name: 'Delhi Mukhyamantri Mahila Samman Yojana', ministry: 'Delhi Govt',             category: 'Women & Child', state: 'Delhi',            benefit: '₹1,000/month',          description: 'Monthly financial assistance to all women voters above 18 years in Delhi.',                                eligibility: ['Woman voter in Delhi', 'Age 18+', 'Delhi resident'], apply_link: 'https://delhi.gov.in', match: 91 },
-]
+]*/
 
 const CAT_COLORS = {
   Agriculture:    'text-scheme-green-light bg-green-900/20',
@@ -53,31 +54,37 @@ export default function SchemesPage() {
   const [stateFilter, setStateFilter] = useState('All States')
   const [activeScheme, setActiveScheme] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
-
+  const [schemes, setSchemes] = useState([])
+const [loading, setLoading] = useState(false)
   const { applyScheme, saveScheme, isSaved } = useSchemeStore()
 
+  useEffect(() => {
+  const fetchSchemes = async () => {
+    try {
+      setLoading(true)
+
+      const params = {}
+
+      if (category !== 'All') params.category = category
+      if (stateFilter !== 'All States') params.state = stateFilter
+      if (search) params.search = search
+
+      const res = await axios.get('/api/schemes', { params })
+
+      setSchemes(res.data.schemes)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to load schemes')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  fetchSchemes()
+}, [category, stateFilter, search])
+
   // ── FIXED: all three filters applied correctly ──
-  const filtered = useMemo(() => {
-    return ALL_SCHEMES.filter(s => {
-      // 1. Search filter
-      const q = search.toLowerCase()
-      const matchSearch = !q ||
-        s.name.toLowerCase().includes(q) ||
-        s.description.toLowerCase().includes(q) ||
-        s.ministry.toLowerCase().includes(q) ||
-        s.benefit.toLowerCase().includes(q)
-
-      // 2. Category filter
-      const matchCat = category === 'All' || s.category === category
-
-      // 3. State filter — "Central" schemes always show + selected state schemes
-      const matchState = stateFilter === 'All States' ||
-        s.state === 'Central' ||
-        s.state === stateFilter
-
-      return matchSearch && matchCat && matchState
-    })
-  }, [search, category, stateFilter])
+const filtered = schemes
 
   // Active filter count for badge
   const activeFilterCount = (category !== 'All' ? 1 : 0) + (stateFilter !== 'All States' ? 1 : 0) + (search ? 1 : 0)
@@ -94,7 +101,7 @@ export default function SchemesPage() {
       <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
         <div className="section-label">Scheme Database</div>
         <h1 className="section-title mb-2">
-          {ALL_SCHEMES.length}+ Government <span className="text-saffron">Welfare Schemes</span>
+          {schemes.length}+ Government <span className="text-saffron">Welfare Schemes</span>
         </h1>
         <p className="section-sub max-w-lg">
           Browse, search and filter schemes by category or state. Central schemes show for all states.
@@ -202,7 +209,7 @@ export default function SchemesPage() {
       {/* Results count */}
       <div className="flex items-center justify-between mb-5">
         <div className="text-xs text-[#8A9BB0]">
-          Showing <span className="text-white font-semibold">{filtered.length}</span> of {ALL_SCHEMES.length} schemes
+          Showing <span className="text-white font-semibold">{filtered.length}</span> of {schemes.length} schemes
           {stateFilter !== 'All States' && <span className="text-saffron ml-1">· {stateFilter} + Central</span>}
           {category !== 'All' && <span className="text-saffron ml-1">· {category}</span>}
           {search && <span className="text-saffron ml-1">· "{search}"</span>}
@@ -225,13 +232,17 @@ export default function SchemesPage() {
           </button>
         </motion.div>
       )}
-
+      {loading && (
+  <div className="text-center text-sm text-[#8A9BB0] py-6">
+    Loading schemes...
+  </div>
+)}
       {/* Schemes grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <AnimatePresence mode="popLayout">
           {filtered.map((scheme, i) => (
             <motion.div
-              key={scheme.id}
+              key={scheme._id}
               layout
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
@@ -344,7 +355,7 @@ export default function SchemesPage() {
 
               <div className="flex gap-3">
                 <a
-                  href={activeScheme.apply_link}
+                  href={activeScheme.applyLink}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-primary flex-1 justify-center"

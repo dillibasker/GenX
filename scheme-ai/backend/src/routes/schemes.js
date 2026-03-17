@@ -1,33 +1,84 @@
 import express from 'express'
+import multer from 'multer'
+import { extractSchemesFromPDF } from '../utils/gazetteParser.js'
 import { Scheme } from '../models/index.js'
 import { ingestSchemes } from '../services/rag.js'
 import { logger } from '../utils/logger.js'
 
 const router = express.Router()
 
+const upload = multer({ dest: 'uploads/' })
+
+// ✅ ADD HERE 👇
+router.post('/upload-gazette', upload.single('file'), async (req, res) => {
+  try {
+    const filePath = req.file.path
+
+    const schemes = await extractSchemesFromPDF(filePath)
+
+    const inserted = await Scheme.insertMany(schemes, { ordered: false })
+
+    await ingestSchemes(inserted)
+
+    res.json({
+      message: 'Gazette processed successfully',
+      count: inserted.length,
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
 // GET /api/schemes — list with filters
 router.get('/', async (req, res) => {
   try {
-    const { category, state, search, page = 1, limit = 20 } = req.query
+    const { category, state, search } = req.query
+
+    const page = Number(req.query.page) || 1
+    const limit = Number(req.query.limit) || 20
 
     const filter = { isActive: true }
-    if (category) filter.category = category
-    if (state) filter.$or = [{ state: 'Central' }, { state: state }]
-    if (search) filter.$text = { $search: search }
 
-    const [schemes, total] = await Promise.all([
-      Scheme.find(filter)
-        .sort(search ? { score: { $meta: 'textScore' } } : { name: 1 })
-        .skip((page - 1) * limit)
-        .limit(Number(limit))
-        .lean(),
-      Scheme.countDocuments(filter),
-    ])
+    if (category) {
+      filter.category = category
+    }
 
-    res.json({ schemes, total, page: Number(page), pages: Math.ceil(total / limit) })
+    if (state) {
+      filter.$or = [
+        { state: 'Central' },
+        { state: state },
+      ]
+    }
+
+    if (search) {
+      filter.$text = { $search: search }
+    }
+
+    const query = Scheme.find(filter)
+
+    // 🔥 Add text score only if searching
+    if (search) {
+      query
+        .select({ score: { $meta: 'textScore' } })
+        .sort({ score: { $meta: 'textScore' } })
+    } else {
+      query.sort({ name: 1 })
+    }
+
+    const schemes = await query
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean()
+
+    const total = await Scheme.countDocuments(filter)
+
+    res.json({
+      schemes,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+    })
   } catch (err) {
-    // Return mock data if DB unavailable
-    res.json({ schemes: MOCK_SCHEMES, total: MOCK_SCHEMES.length, page: 1, pages: 1 })
+    res.status(500).json({ error: err.message })
   }
 })
 
